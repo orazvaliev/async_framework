@@ -1,63 +1,42 @@
 from time import time, sleep
 
 
+def start_gen(f):
+    def wrap(*args, **kwargs):
+        gen = f(*args, **kwargs)
+        gen.send(None)
+        return gen
+    return wrap
+
+
 class TimeEvent:
     def __init__(self, loop, moment, callback):
         self.loop = loop
         self.moment = moment
         self.callback = callback
-        loop.new_events.append(self)
 
-    def check(self):
+    def check_event(self):
         if time() >= self.moment:
-            self.callback(self.moment)
+            self.callback()
             return True
+        else:
+            return False
 
 
 class AsyncLoop:
     def __init__(self):
-        self.events = []
-        self.new_events = []
+        self.events: [TimeEvent] = []
 
     def process_events(self):
-        self.events = [e for e in self.events if not e.check()]
-        self.events.extend(self.new_events)
-        self.new_events = []
+        self.events = [e for e in self.events if not e.check_event()]
 
-    def run_foreva(self):
-        while self.events or self.new_events:
+    def run_loop(self):
+        while self.events:
             self.process_events()
             sleep(0.1)
 
-
-def f1(v):
-    print("Callback", v)
-    TimeEvent(loop, time() + 1, f1)
-
-
+@start_gen
 def run(gen):
-    def _callback(v):
-        try:
-            ev = gen.send(v)
-        except StopIteration as e:
-            return
-        ev.callback = _callback
-
-    _callback(None)
-
-
-def my_gen_coroutine(loop):
-    print((yield TimeEvent(loop, time() + 1, None)))
-    print("QQ")
-    print((yield TimeEvent(loop, time() + 2, None)))
-    print("QQ")
-    print((yield TimeEvent(loop, time() + 3, None)))
-    print("QQ")
-
-
-loop = AsyncLoop()
-
-run(my_gen_coroutine(loop))
-
-loop.run_foreva()
+    try:
+        event = gen.send
 
